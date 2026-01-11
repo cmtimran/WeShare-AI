@@ -7,12 +7,24 @@ interface NavbarProps {
     onLogin: () => void;
     isLoggedIn: boolean;
     onLogout: () => void;
+    onOpenDashboard?: () => void;
+    onGoHome?: () => void;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ onOpenPricing, onLogin, isLoggedIn, onLogout }) => {
+export const Navbar: React.FC<NavbarProps> = ({
+    onOpenPricing,
+    onLogin,
+    isLoggedIn,
+    onLogout,
+    onOpenDashboard,
+    onGoHome
+}) => {
     return (
         <nav className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-6 py-4 md:px-12 backdrop-blur-md bg-black/20 border-b border-white/10 transition-all duration-300">
-            <div className="flex items-center space-x-2 cursor-pointer" onClick={() => window.location.reload()}>
+            <div
+                className="flex items-center space-x-2 cursor-pointer"
+                onClick={onGoHome || (() => window.location.reload())}
+            >
                 <div className="bg-white/10 p-2 rounded-lg backdrop-blur-sm">
                     <Cloud className="w-6 h-6 text-white" />
                 </div>
@@ -20,6 +32,9 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenPricing, onLogin, isLogged
             </div>
 
             <div className="hidden md:flex items-center space-x-8">
+                {isLoggedIn && (
+                    <button onClick={onOpenDashboard} className="text-sm font-medium text-white/70 hover:text-white transition-colors">Dashboard</button>
+                )}
                 <button onClick={() => window.location.hash = '#features'} className="text-sm font-medium text-white/70 hover:text-white transition-colors">Features</button>
                 <button onClick={() => window.location.hash = '#security'} className="text-sm font-medium text-white/70 hover:text-white transition-colors">Security</button>
                 <button onClick={onOpenPricing} className="text-sm font-medium text-white/70 hover:text-white transition-colors">Pricing</button>

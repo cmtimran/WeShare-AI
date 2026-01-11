@@ -70,6 +70,14 @@ export const saveTransfer = async (transfer: TransferData): Promise<string> => {
 
   if (!kvResponse.ok) throw new Error('Failed to save transfer metadata');
 
+  // Auto-save to history (Fire & Forget)
+  // We don't want to block the user if history save fails
+  addToHistory({
+    id,
+    files: uploadedFiles,
+    totalSize: transfer.totalSize
+  }).catch(e => console.warn("Failed to add to history", e));
+
   return id;
 };
 
@@ -89,44 +97,42 @@ export const getTransfer = async (id: string): Promise<TransferData | undefined>
   }
 };
 
-// --- User Management (Mock for now, KV potential later) ---
-// Note: Real auth would require Vercel Auth or similar. Keeping it simple/mock for now as requested.
+// --- User Management (Real API) ---
 
-const USERS_KEY = "weshare_users";
 const CURRENT_USER_KEY = "weshare_current_user_uid";
 
 export const registerUser = async (email: string, password: string): Promise<User> => {
-  // Simulate delay
-  await new Promise(r => setTimeout(r, 500));
+  const uid = Date.now().toString(); // Generate UID client-side or let server do it.
 
-  const usersAttr = localStorage.getItem(USERS_KEY);
-  const users: Record<string, User & { password: string }> = usersAttr ? JSON.parse(usersAttr) : {};
+  const response = await fetch(`/api/user?action=register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password, uid })
+  });
 
-  const existingUser = Object.values(users).find(u => u.email === email);
-  if (existingUser) throw new Error("User already exists");
+  if (!response.ok) {
+    const err = await response.json();
+    throw new Error(err.error || "Registration failed");
+  }
 
-  const uid = Date.now().toString();
-  const newUser: User = {
-    uid,
-    email,
-    name: email.split('@')[0],
-    plan: 'free',
-    createdAt: Date.now()
-  };
-
-  users[uid] = { ...newUser, password };
-  localStorage.setItem(USERS_KEY, JSON.stringify(users));
-  localStorage.setItem(CURRENT_USER_KEY, uid);
-
-  return newUser;
+  const user = await response.json();
+  localStorage.setItem(CURRENT_USER_KEY, user.uid);
+  return user;
 };
 
 export const loginUser = async (email: string, password: string): Promise<void> => {
-  await new Promise(r => setTimeout(r, 500));
-  const usersAttr = localStorage.getItem(USERS_KEY);
-  const users: Record<string, User & { password: string }> = usersAttr ? JSON.parse(usersAttr) : {};
-  const user = Object.values(users).find(u => u.email === email && u.password === password);
-  if (!user) throw new Error("Invalid credentials");
+  const response = await fetch(`/api/user?action=login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password })
+  });
+
+  if (!response.ok) {
+    const err = await response.json();
+    throw new Error(err.error || "Login failed");
+  }
+
+  const user = await response.json();
   localStorage.setItem(CURRENT_USER_KEY, user.uid);
 };
 
@@ -135,9 +141,13 @@ export const logoutUser = async () => {
 };
 
 export const getUserProfile = async (uid: string): Promise<User | null> => {
-  const usersAttr = localStorage.getItem(USERS_KEY);
-  const users: Record<string, User> = usersAttr ? JSON.parse(usersAttr) : {};
-  return users[uid] || null;
+  try {
+    const response = await fetch(`/api/user?uid=${uid}`);
+    if (!response.ok) return null;
+    return await response.json();
+  } catch {
+    return null;
+  }
 };
 
 export const getCurrentUser = async (): Promise<User | null> => {
@@ -147,10 +157,32 @@ export const getCurrentUser = async (): Promise<User | null> => {
 };
 
 export const updateUserPlan = async (uid: string, plan: 'free' | 'pro'): Promise<void> => {
-  const usersAttr = localStorage.getItem(USERS_KEY);
-  const users: Record<string, User & { password: string }> = usersAttr ? JSON.parse(usersAttr) : {};
-  if (users[uid]) {
-    users[uid].plan = plan;
-    localStorage.setItem(USERS_KEY, JSON.stringify(users));
+  const response = await fetch(`/api/user`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ uid, plan })
+  });
+
+  if (!response.ok) throw new Error("Update failed");
+};
+
+// --- History Integration ---
+export const addToHistory = async (transfer: any) => {
+  const user = await getCurrentUser();
+  if (user) {
+    await fetch('/api/history', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ uid: user.uid, transfer })
+    });
   }
+};
+
+export const getHistory = async () => {
+  const user = await getCurrentUser();
+  if (!user) return [];
+
+  const res = await fetch(`/api/history?uid=${user.uid}`);
+  if (res.ok) return await res.json();
+  return [];
 };
