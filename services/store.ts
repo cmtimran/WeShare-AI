@@ -1,13 +1,5 @@
-import { db, auth } from "../firebaseConfig";
-import { 
-  collection, 
-  addDoc, 
-  doc, 
-  getDoc, 
-  setDoc, 
-  updateDoc 
-} from "firebase/firestore";
 import { TransferData, User, UploadedFile } from "../types";
+import { PutBlobResult } from '@vercel/blob';
 
 // --- Helpers ---
 export const formatBytes = (bytes: number, decimals = 2) => {
@@ -28,113 +20,137 @@ export const fileToBase64 = (file: File): Promise<string> => {
   });
 };
 
-// --- Transfers (Firestore) ---
+// --- Transfers (Vercel Blob & KV) ---
 
 export const saveTransfer = async (transfer: TransferData): Promise<string> => {
-  if (!db) throw new Error("Firebase DB not initialized");
-  
-  // Create a clean object for Firestore
-  const transferPayload = {
-    message: transfer.message,
-    senderEmail: transfer.senderEmail,
-    recipientEmail: transfer.recipientEmail || null,
-    settings: transfer.settings,
-    createdAt: transfer.createdAt,
-    totalSize: transfer.totalSize,
-    files: transfer.files.map(f => ({
-      id: f.id,
-      name: f.name,
-      size: f.size,
-      type: f.type,
-      data: f.data // Storing base64 in Firestore (Limit: 1MB doc size!)
-    }))
+  // 1. Upload files to Vercel Blob
+  const uploadedFiles: UploadedFile[] = [];
+
+  for (const fileObj of transfer.files) {
+    if (fileObj.data && fileObj.data.startsWith('data:')) {
+      // Convert base64 back to Blob for upload
+      const res = await fetch(fileObj.data);
+      const blob = await res.blob();
+
+      // Upload via API
+      const response = await fetch(`/api/upload?filename=${encodeURIComponent(fileObj.name)}`, {
+        method: 'POST',
+        body: blob,
+      });
+
+      if (!response.ok) throw new Error('File upload failed');
+
+      const blobResult = (await response.json()) as PutBlobResult;
+
+      uploadedFiles.push({
+        ...fileObj,
+        data: blobResult.url, // Store the public URL instead of base64
+        previewUrl: blobResult.url
+      });
+    } else {
+      // If for some reason data is missing or not base64, skip or handle error
+      console.warn("Skipping invalid file data", fileObj.name);
+    }
+  }
+
+  // 2. Save metadata to Vercel KV
+  const id = transfer.id || Date.now().toString(36) + Math.random().toString(36).substr(2);
+
+  const payload = {
+    ...transfer,
+    id,
+    files: uploadedFiles // with Blob URLs
   };
 
-  const docRef = await addDoc(collection(db, "transfers"), transferPayload);
-  return docRef.id;
+  const kvResponse = await fetch('/api/transfer', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+
+  if (!kvResponse.ok) throw new Error('Failed to save transfer metadata');
+
+  return id;
 };
 
 export const getTransfer = async (id: string): Promise<TransferData | undefined> => {
-  if (!db) return undefined;
-  
   try {
-    const docRef = doc(db, "transfers", id);
-    const docSnap = await getDoc(docRef);
-
-    if (docSnap.exists()) {
-      const data = docSnap.data() as any;
-      
-      // Reconstruct files with preview URLs from base64 data
-      const files: UploadedFile[] = data.files.map((f: any) => ({
-        ...f,
-        previewUrl: f.type.startsWith('image/') ? f.data : undefined
-      }));
-
-      return {
-        id: docSnap.id,
-        files,
-        message: data.message,
-        senderEmail: data.senderEmail,
-        recipientEmail: data.recipientEmail,
-        settings: data.settings,
-        createdAt: data.createdAt,
-        totalSize: data.totalSize
-      };
-    } else {
-      return undefined;
+    const response = await fetch(`/api/transfer?id=${id}`);
+    if (!response.ok) {
+      if (response.status === 404) return undefined;
+      throw new Error('Failed to fetch transfer');
     }
+
+    const data = await response.json();
+    return data as TransferData;
   } catch (e) {
     console.error("Error fetching transfer", e);
     return undefined;
   }
 };
 
-// --- User Management (Auth & Firestore) ---
+// --- User Management (Mock for now, KV potential later) ---
+// Note: Real auth would require Vercel Auth or similar. Keeping it simple/mock for now as requested.
+
+const USERS_KEY = "weshare_users";
+const CURRENT_USER_KEY = "weshare_current_user_uid";
 
 export const registerUser = async (email: string, password: string): Promise<User> => {
-  if (!auth || !db) throw new Error("Firebase not ready");
+  // Simulate delay
+  await new Promise(r => setTimeout(r, 500));
 
-  const userCredential = await auth.createUserWithEmailAndPassword(email, password);
-  const fbUser = userCredential.user;
-  
-  if (!fbUser) throw new Error("User creation failed");
+  const usersAttr = localStorage.getItem(USERS_KEY);
+  const users: Record<string, User & { password: string }> = usersAttr ? JSON.parse(usersAttr) : {};
 
+  const existingUser = Object.values(users).find(u => u.email === email);
+  if (existingUser) throw new Error("User already exists");
+
+  const uid = Date.now().toString();
   const newUser: User = {
-    uid: fbUser.uid,
-    email: fbUser.email || '',
-    name: fbUser.email?.split('@')[0] || 'User',
-    plan: 'free', // Default plan
+    uid,
+    email,
+    name: email.split('@')[0],
+    plan: 'free',
     createdAt: Date.now()
   };
 
-  // Create user profile in Firestore
-  await setDoc(doc(db, "users", fbUser.uid), newUser);
-  
+  users[uid] = { ...newUser, password };
+  localStorage.setItem(USERS_KEY, JSON.stringify(users));
+  localStorage.setItem(CURRENT_USER_KEY, uid);
+
   return newUser;
 };
 
 export const loginUser = async (email: string, password: string): Promise<void> => {
-  if (!auth) throw new Error("Firebase not ready");
-  await auth.signInWithEmailAndPassword(email, password);
+  await new Promise(r => setTimeout(r, 500));
+  const usersAttr = localStorage.getItem(USERS_KEY);
+  const users: Record<string, User & { password: string }> = usersAttr ? JSON.parse(usersAttr) : {};
+  const user = Object.values(users).find(u => u.email === email && u.password === password);
+  if (!user) throw new Error("Invalid credentials");
+  localStorage.setItem(CURRENT_USER_KEY, user.uid);
 };
 
 export const logoutUser = async () => {
-  if (!auth) return;
-  await auth.signOut();
+  localStorage.removeItem(CURRENT_USER_KEY);
 };
 
 export const getUserProfile = async (uid: string): Promise<User | null> => {
-  if (!db) return null;
-  const docRef = doc(db, "users", uid);
-  const docSnap = await getDoc(docRef);
-  if (docSnap.exists()) {
-    return docSnap.data() as User;
-  }
-  return null;
+  const usersAttr = localStorage.getItem(USERS_KEY);
+  const users: Record<string, User> = usersAttr ? JSON.parse(usersAttr) : {};
+  return users[uid] || null;
+};
+
+export const getCurrentUser = async (): Promise<User | null> => {
+  const uid = localStorage.getItem(CURRENT_USER_KEY);
+  if (!uid) return null;
+  return getUserProfile(uid);
 };
 
 export const updateUserPlan = async (uid: string, plan: 'free' | 'pro'): Promise<void> => {
-  if (!db) return;
-  const docRef = doc(db, "users", uid);
-  await updateDoc(docRef, { plan });
+  const usersAttr = localStorage.getItem(USERS_KEY);
+  const users: Record<string, User & { password: string }> = usersAttr ? JSON.parse(usersAttr) : {};
+  if (users[uid]) {
+    users[uid].plan = plan;
+    localStorage.setItem(USERS_KEY, JSON.stringify(users));
+  }
 };

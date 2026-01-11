@@ -22,6 +22,7 @@ export interface TransferData {
   settings: TransferSettings;
   createdAt: number;
   totalSize: number;
+  isLocked?: boolean;
 }
 
 export interface User {

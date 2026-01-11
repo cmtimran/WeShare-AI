@@ -22,15 +22,15 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, 
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity" onClick={onClose} />
-      <div className={`relative bg-white rounded-2xl shadow-2xl w-full ${maxWidth} max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-200 custom-scrollbar`}>
+      <div className="absolute inset-0 bg-black/80 backdrop-blur-sm transition-opacity" onClick={onClose} />
+      <div className={`relative bg-[#0f0f16] border border-white/10 text-white rounded-2xl shadow-2xl w-full ${maxWidth} max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-200 custom-scrollbar`}>
         <div className="sticky top-0 right-0 z-10 flex justify-end p-4 pointer-events-none">
-           <button onClick={onClose} className="pointer-events-auto p-2 bg-white/80 hover:bg-gray-100 rounded-full transition-colors backdrop-blur-sm shadow-sm">
-             <X className="w-5 h-5 text-gray-500" />
-           </button>
+          <button onClick={onClose} className="pointer-events-auto p-2 bg-white/5 hover:bg-white/10 rounded-full transition-colors backdrop-blur-sm shadow-sm border border-white/5">
+            <X className="w-5 h-5 text-gray-400 hover:text-white" />
+          </button>
         </div>
         <div className="px-8 pb-8 pt-2">
-          {title && <h2 className="text-2xl font-bold mb-6 text-gray-900">{title}</h2>}
+          {title && <h2 className="text-2xl font-bold mb-6 text-white">{title}</h2>}
           {children}
         </div>
       </div>
