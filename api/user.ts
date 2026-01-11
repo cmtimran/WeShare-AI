@@ -74,16 +74,33 @@ export default async function handler(req, res) {
         }
     }
 
-    // PUT: Update Profile (e.g. Upgrade)
+    // PUT: Update Profile (Upgrade, Password, Settings)
     if (req.method === 'PUT') {
-        const { uid, plan } = req.body;
+        const { action } = req.query;
+        const { uid, plan, oldPassword, newPassword, settings } = req.body;
+
         if (!uid) return res.status(400).json({ error: 'Missing UID' });
 
         try {
             const user: any = await db.get(`user:${uid}`);
             if (!user) return res.status(404).json({ error: 'User not found' });
 
-            const updatedUser = { ...user, plan: plan || user.plan };
+            let updatedUser = { ...user };
+
+            if (action === 'password') {
+                if (user.password !== oldPassword) {
+                    return res.status(403).json({ error: 'Incorrect current password' });
+                }
+                updatedUser.password = newPassword;
+            }
+            else if (action === 'settings') {
+                updatedUser.settings = { ...(user.settings || {}), ...settings };
+            }
+            else {
+                // Default: Update Plan (or other root fields)
+                updatedUser.plan = plan || user.plan;
+            }
+
             await db.set(`user:${uid}`, updatedUser);
 
             const { password: _, ...safeUser } = updatedUser;

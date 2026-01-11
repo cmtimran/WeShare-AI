@@ -31,4 +31,8 @@ export interface User {
   name: string;
   plan: 'free' | 'pro';
   createdAt: number;
+  settings?: {
+    emailNotifications?: boolean;
+    defaultExpiry?: string;
+  };
 }
