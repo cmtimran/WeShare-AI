@@ -1,20 +1,51 @@
+# WeShare AI 🚀
+
 <div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+  <h3>Share at the speed of thought.</h3>
+  <p>AI-powered, secure, and lightning-fast file sharing platform.</p>
 </div>
 
-# Run and deploy your AI Studio app
+## ✨ Features
 
-This contains everything you need to run your app locally.
+- **⚡ Instant Sharing**: Upload files and get a shareable link in seconds.
+- **🔒 Secure Transfer**: Optional password protection and military-grade encryption.
+- **🧠 AI Summaries**: (Coming Soon) Auto-generate summaries for documents.
+- **👤 User Dashboard**: track your history, manage files, and view stats.
+- **🎨 Modern UI**: Beautiful dark-mode glassmorphism design.
 
-View your app in AI Studio: https://ai.studio/apps/drive/1LHiz9JFkzQAgnnRgCXFsAmbvuVV6V9ca
+## 🛠️ Tech Stack
 
-## Run Locally
+- **Frontend**: React 19, Vite, TypeScript, Tailwind CSS.
+- **Backend (Serverless)**: Vercel Functions (Node.js).
+- **Storage**: Vercel Blob (Files) & Vercel KV / Redis (Metadata).
+- **Deployment**: Vercel.
 
-**Prerequisites:**  Node.js
+## 🚀 Getting Started
 
+### Prerequisites
+- Node.js 18+
+- Vercel CLI (optional, for local serverless dev)
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+### Local Development (Mock Server)
+If you want to run offline without Vercel:
+```bash
+npm install
+node server/index.js  # Starts mock backend on :3001
+npm run dev           # Starts frontend on :3000
+```
+
+### Local Development (Vercel Mode - Recommended)
+To run with real cloud APIs (requires env vars):
+```bash
+vercel dev
+```
+
+## 📦 Deployment
+
+This project is optimized for [Vercel](https://vercel.com).
+See **[DEPLOYMENT.md](DEPLOYMENT.md)** for a step-by-step production guide.
+
+## 📄 License
+
+MIT
+
