@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Header, ModalType } from './components/Header'; // We'll replace Header with Navbar, but keep types if needed or redefine
+import { ModalType } from './components/Header';
 import { User } from './types';
 import { Modal } from './components/Modal';
 import { AuthModal } from './components/AuthModal';
@@ -11,9 +11,10 @@ import { Navbar } from './components/Navbar';
 import { Hero } from './components/Hero';
 import { Features } from './components/Features';
 import { Footer } from './components/Footer';
+import { Dashboard } from './components/Dashboard/Dashboard';
 
 export const App: React.FC = () => {
-  const [currentView, setCurrentView] = useState<'upload' | 'download' | 'success'>('upload');
+  const [currentView, setCurrentView] = useState<'upload' | 'download' | 'success' | 'dashboard'>('upload');
   const [transferId, setTransferId] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [activeModal, setActiveModal] = useState<ModalType>(null);
@@ -22,6 +23,10 @@ export const App: React.FC = () => {
   const checkUser = async () => {
     const user = await getCurrentUser();
     setUser(user);
+    if (user && currentView === 'upload' && !window.location.hash) {
+      // Optional: Auto redirect to dashboard on load if logged in?
+      // setCurrentView('dashboard');
+    }
   };
 
   // Auth Listener
@@ -45,15 +50,16 @@ export const App: React.FC = () => {
   const handleLogout = async () => {
     await logoutUser();
     setUser(null);
+    setCurrentView('upload');
   };
 
   // Render modal content helper
   const renderModalContent = () => {
     switch (activeModal) {
       case 'auth_login':
-        return <AuthModal mode="login" onSuccess={() => { setActiveModal(null); checkUser(); }} onSwitchMode={(m) => setActiveModal(m === 'login' ? 'auth_login' : 'auth_signup')} />;
+        return <AuthModal mode="login" onSuccess={() => { setActiveModal(null); checkUser().then(() => setCurrentView('dashboard')); }} onSwitchMode={(m) => setActiveModal(m === 'login' ? 'auth_login' : 'auth_signup')} />;
       case 'auth_signup':
-        return <AuthModal mode="signup" onSuccess={() => { setActiveModal(null); checkUser(); }} onSwitchMode={(m) => setActiveModal(m === 'login' ? 'auth_login' : 'auth_signup')} />;
+        return <AuthModal mode="signup" onSuccess={() => { setActiveModal(null); checkUser().then(() => setCurrentView('dashboard')); }} onSwitchMode={(m) => setActiveModal(m === 'login' ? 'auth_login' : 'auth_signup')} />;
       case 'help':
         return <HelpContent />;
       case 'about':
@@ -93,8 +99,12 @@ export const App: React.FC = () => {
           setCurrentView('download');
         }
       } else if (!hash.startsWith('#')) {
-        setCurrentView('upload');
-        setTransferId(null);
+        // If simply root, default to upload.
+        // If we are in dashboard mode, we don't want to auto-switch to upload unless hash is empty explicitly and we are not logged in?
+        // Actually, let's keep it simple. Only handle explicit transfer links.
+        if (hash === '' && currentView !== 'dashboard') {
+          setTransferId(null);
+        }
       }
     };
 
@@ -104,7 +114,7 @@ export const App: React.FC = () => {
     // Listen for changes
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
-  }, []);
+  }, []); // Removed currentView dependency to avoid loops
 
 
   const getModalTitle = () => {
@@ -128,34 +138,69 @@ export const App: React.FC = () => {
     return 'max-w-lg';
   };
 
-  return (
-    <div className="min-h-screen w-full bg-[#0a0a0f] text-white overflow-x-hidden selection:bg-blue-500/30">
+  // Navigation Handler
+  const handleNavigation = (section: 'dashboard' | 'features' | 'security' | 'pricing' | 'home') => {
+    if (section === 'pricing') {
+      setActiveModal('pricing');
+      return;
+    }
 
+    if (section === 'dashboard') {
+      if (user) {
+        setCurrentView('dashboard');
+        window.location.hash = '';
+      } else {
+        setActiveModal('auth_login');
+      }
+      return;
+    }
+
+    // For Home, Features, Security -> Switch to Upload/Home view first
+    setCurrentView('upload');
+
+    if (section === 'home') {
+      window.location.hash = '';
+      return;
+    }
+
+    // Allow render cycle to complete before scrolling
+    setTimeout(() => {
+      window.location.hash = `#${section}`;
+    }, 50);
+  };
+
+  return (
+    <div className="min-h-screen w-full bg-[#0a0a0f] text-white overflow-x-hidden selection:bg-blue-500/30 font-sans">
       <Navbar
         isLoggedIn={!!user}
         onLogin={() => setActiveModal('auth_login')}
         onLogout={handleLogout}
         onOpenPricing={() => setActiveModal('pricing')}
+        onNavigate={handleNavigation}
       />
 
       <main>
-        <Hero
-          currentView={currentView}
-          user={user}
-          transferId={transferId}
-          onTransferComplete={handleTransferComplete}
-          onOpenPricing={() => setActiveModal('pricing')}
-          setCurrentView={setCurrentView}
-          onBackToHome={() => {
-            window.location.hash = '';
-            setCurrentView('upload');
-          }}
-        />
-
-        <Features />
+        {currentView === 'dashboard' && user ? (
+          <Dashboard user={user} onLogout={handleLogout} onRefreshProfile={refreshProfile} />
+        ) : (
+          <>
+            <Hero
+              currentView={currentView === 'dashboard' ? 'upload' : currentView}
+              user={user}
+              transferId={transferId}
+              onTransferComplete={handleTransferComplete}
+              onOpenPricing={() => setActiveModal('pricing')}
+              setCurrentView={(view) => setCurrentView(view as any)}
+              onBackToHome={() => {
+                window.location.hash = '';
+                setCurrentView('upload');
+              }}
+            />
+            <Features />
+            <Footer onOpenModal={setActiveModal} />
+          </>
+        )}
       </main>
-
-      <Footer onOpenModal={setActiveModal} />
 
       {/* Global Modal */}
       <Modal
