@@ -29,6 +29,7 @@ Your app needs two storage databases to function:
    - In your valid Vercel Project, go to the **Storage** tab.
    - Click **Create Database**.
    - Select **Blob**.
+   - Name it **WeShareBlob** (as you created).
    - Follow steps to create it and **Connect** it to your `WeShare-AI` project.
    - *This automatically adds `BLOB_READ_WRITE_TOKEN` to your Environment Variables.*
 
@@ -36,6 +37,7 @@ Your app needs two storage databases to function:
    - In the **Storage** tab again.
    - Click **Create Database**.
    - Select **KV** (Redis).
+   - Name it **redis-WeShare** (as you created).
    - Create and **Connect** it to your `WeShare-AI` project.
    - *This automatically adds `KV_REST_API_URL` and `KV_REST_API_TOKEN`.*
 
