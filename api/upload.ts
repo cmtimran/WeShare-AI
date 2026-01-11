@@ -15,22 +15,22 @@ export default async function handler(req, res) {
     }
 
     try {
-        const { filename } = req.query;
+        // Manually parse query params in case req.query is incomplete
+        const url = new URL(req.url, `http://${req.headers.host}`);
+        const filename = url.searchParams.get('filename') || req.query?.filename;
 
-        // Upload to Vercel Blob
-        // We pass the request object directly if we want streaming, but "put" usually takes content.
-        // If bodyParser is false, req is a stream.
+        if (!filename) {
+            return res.status(400).json({ error: 'Filename is missing' });
+        }
 
-        // NOTE: For simplicity in this Node function, let's trust "put" to handle the stream
-        // or we read the buffer. 
-
-        if (!process.env.BLOB_READ_WRITE_TOKEN) {
+        const token = process.env.BLOB_READ_WRITE_TOKEN;
+        if (!token) {
             throw new Error('BLOB_READ_WRITE_TOKEN is not defined');
         }
 
         const blob = await put(filename, req, {
             access: 'public',
-            // Ensure we use the correct token from env
+            token: token,
         });
 
         return res.status(200).json(blob);
