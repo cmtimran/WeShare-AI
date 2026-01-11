@@ -173,6 +173,7 @@ export const App: React.FC = () => {
     <div className="min-h-screen w-full bg-[#0a0a0f] text-white overflow-x-hidden selection:bg-blue-500/30 font-sans">
       <Navbar
         isLoggedIn={!!user}
+        user={user}
         onLogin={() => setActiveModal('auth_login')}
         onLogout={handleLogout}
         onOpenPricing={() => setActiveModal('pricing')}

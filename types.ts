@@ -30,6 +30,7 @@ export interface User {
   email: string;
   name: string;
   plan: 'free' | 'pro';
+  avatar?: string;
   createdAt: number;
   settings?: {
     emailNotifications?: boolean;
